@@ -1,27 +1,30 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { supabase } from "./supabase-client";
 
 function Session() {
+  const router = useRouter();
+  const supabaseClient = createClientComponentClient();
   const [session, setSession] = useState<any>(null);
-  const fetchSession = async () => {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      console.log("error fetching session", error);
-    }
-    console.log(data);
-    setSession(data.session);
-  };
 
   useEffect(() => {
-    fetchSession();
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-    });
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT") {
+          router.push("/signin");
+        } else if (event === "SIGNED_IN") {
+          router.refresh();
+        }
+        setSession(session);
+      }
+    );
+
     return () => {
-      data?.subscription?.unsubscribe();
+      subscription?.unsubscribe();
     };
-  }, []);
+  }, [router, supabaseClient.auth]);
 
   return (
     <>

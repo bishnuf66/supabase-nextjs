@@ -1,333 +1,350 @@
 "use client";
-import { useEffect, useState } from "react";
-import { supabase } from "./supabase-client";
-import Session from "./Session";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Task } from "@/types";
+import { PostgresChangesPayload } from "@/types/supabase";
+import { TasksList } from "@/features/tasks/components/TasksList";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
-  const [newTask, setNewTask] = useState({
-    title: "",
-    description: "",
-  });
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [session, setSession] = useState<any>(null);
+  const supabase = createClientComponentClient();
+  const router = useRouter();
 
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [editingTask, setEditingTask] = useState<any>(null);
-
+  // Fetch tasks
   const fetchTasks = async () => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) {
-      console.log("error fetching tasks", error.message);
-    }
-    console.log(data, error);
-    setTasks(data || []);
-  };
+    try {
+      setIsLoading(true);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const uploadImage = async (image: File) => {
-    const filePath = `${Date.now()}-${image.name}`; // this will be stored in DB for deletion
-    const { error } = await supabase.storage
-      .from("tasks-images")
-      .upload(filePath, image);
-
-    if (error) {
-      console.log("error uploading file", error);
-      return { publicUrl: null, path: null };
-    }
-
-    const { data } = supabase.storage
-      .from("tasks-images")
-      .getPublicUrl(filePath);
-
-    return { publicUrl: data?.publicUrl, path: filePath };
-  };
-
-  const handleSubmit = async () => {
-    let imageUrl = null;
-    let imagePath = null;
-
-    if (taskImage) {
-      const uploaded = await uploadImage(taskImage);
-      imageUrl = uploaded.publicUrl;
-      imagePath = uploaded.path;
-    }
-
-    const { data, error } = await supabase.from("tasks").insert({
-      ...newTask,
-      email: session?.user?.email,
-      image_url: imageUrl,
-      image_path: imagePath, // new column for deletion
-    });
-
-    if (error) {
-      console.log("error inserting task", error);
-    } else {
-      console.log(data);
-      fetchTasks();
-      setNewTask({ title: "", description: "" });
-      setTaskImage(null);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    console.log("🗑️ Starting delete for task ID:", id);
-
-    // 1. Get the task record first (to get the image path)
-    const { data: taskData, error: fetchError } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (fetchError) {
-      console.error("❌ Error fetching task before delete", fetchError);
-      return;
-    }
-
-    console.log("📄 Task data:", taskData);
-    console.log("🖼️ Image path to delete:", taskData?.image_path);
-
-    // 2. Delete the image if it exists
-    if (taskData?.image_path) {
-      console.log("🔍 Attempting to delete image from storage...");
-
-      // First, let's check if the file actually exists before deletion
-      const { data: fileExists, error: listError } = await supabase.storage
-        .from("tasks-images")
-        .list("", {
-          search: taskData.image_path,
-        });
-
-      console.log("📂 File search result:", fileExists);
-      console.log("📂 List error:", listError);
-
-      // Try to get the file info before deletion
-      const { data: fileInfo, error: getError } = await supabase.storage
-        .from("tasks-images")
-        .download(taskData.image_path);
-
-      if (getError) {
-        console.log(
-          "⚠️ File might not exist or can't be accessed:",
-          getError.message
-        );
-      } else {
-        console.log("✅ File exists and is accessible");
+      if (!session) {
+        router.push("/signin");
+        return;
       }
 
-      // Now attempt deletion
-      const { data: deleteData, error: storageError } = await supabase.storage
-        .from("tasks-images")
-        .remove([taskData.image_path]);
+      setSession(session);
 
-      console.log("🗑️ Delete operation result:", deleteData);
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("email", session.user.email)
+        .order("created_at", { ascending: false });
 
-      if (storageError) {
-        console.error("❌ Error deleting image from storage", storageError);
-        console.error("Storage error details:", storageError.message);
-        console.error("Full error object:", storageError);
-      } else {
-        console.log("✅ Image deletion API call succeeded");
+      if (error) throw error;
 
-        // Verify deletion by trying to access the file again
-        const { data: verifyData, error: verifyError } = await supabase.storage
+      setTasks(data || []);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle task creation
+  const handleCreateTask = async (taskData: {
+    title: string;
+    description: string;
+    image?: File | null;
+  }) => {
+    try {
+      setIsCreating(true);
+
+      if (!session) {
+        router.push("/signin");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert([
+          {
+            title: taskData.title,
+            description: taskData.description,
+            email: session.user.email,
+            image_url: null,
+            image_path: null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Handle image upload if present
+      if (taskData.image) {
+        const fileExt = taskData.image.name.split(".").pop();
+        const fileName = `${data.id}.${fileExt}`;
+        const filePath = `${session.user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
           .from("tasks-images")
-          .download(taskData.image_path);
+          .upload(filePath, taskData.image);
 
-        if (verifyError) {
-          console.log("✅ Verification: File no longer exists (good!)");
-        } else {
-          console.log("⚠️ WARNING: File still exists after deletion!");
+        if (uploadError) throw uploadError;
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("tasks-images").getPublicUrl(filePath);
+
+        // Update the task with the image URL and path
+        const { error: updateError } = await supabase
+          .from("tasks")
+          .update({
+            image_url: publicUrl,
+            image_path: filePath,
+          })
+          .eq("id", data.id);
+
+        if (updateError) throw updateError;
+
+        data.image_url = publicUrl;
+        data.image_path = filePath;
+      }
+
+      setTasks((prev) => [data, ...prev]);
+      return data;
+    } catch (error) {
+      console.error("Error creating task:", error);
+      throw error;
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Handle task update
+  const handleUpdateTask = async (
+    id: string,
+    taskData: { title: string; description: string; image?: File | null }
+  ) => {
+    try {
+      setIsUpdating(true);
+
+      const updates: {
+        title: string;
+        description: string;
+        updated_at: string;
+        image_url?: string | null;
+        image_path?: string | null;
+      } = {
+        title: taskData.title,
+        description: taskData.description,
+        updated_at: new Date().toISOString(),
+      };
+
+      // If there's a new image, upload it
+      if (taskData.image) {
+        // First, delete the old image if it exists
+        const { data: existingTask } = await supabase
+          .from("tasks")
+          .select("image_path")
+          .eq("id", id)
+          .single();
+
+        if (existingTask?.image_path) {
+          const { error: deleteError } = await supabase.storage
+            .from("tasks-images")
+            .remove([existingTask.image_path]);
+
+          if (deleteError)
+            console.error("Error deleting old image:", deleteError);
+        }
+
+        // Upload the new image
+        const fileExt = taskData.image.name.split(".").pop();
+        const fileName = `${id}.${fileExt}`;
+        const filePath = `${session.user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("tasks-images")
+          .upload(filePath, taskData.image, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("tasks-images").getPublicUrl(filePath);
+
+        updates.image_url = publicUrl;
+        updates.image_path = filePath;
+      }
+
+      const { data, error } = await supabase
+        .from("tasks")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTasks((prev) => prev.map((task) => (task.id === id ? data : task)));
+      return data;
+    } catch (error) {
+      console.error("Error updating task:", error);
+      throw error;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Handle task deletion
+  const handleDeleteTask = async (id: string) => {
+    try {
+      setIsDeleting(true);
+
+      // First, get the task to check for an associated image
+      const { data: taskToDelete, error: fetchError } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Delete the image if it exists
+      if (taskToDelete?.image_path) {
+        const { error: deleteImageError } = await supabase.storage
+          .from("tasks-images")
+          .remove([taskToDelete.image_path]);
+
+        if (deleteImageError) {
+          console.error("Error deleting image:", deleteImageError);
+          // Continue with task deletion even if image deletion fails
         }
       }
-    } else {
-      console.log("ℹ️ No image path found, skipping image deletion");
-    }
 
-    // 3. Delete the task from the database
-    console.log("🗃️ Deleting task from database...");
-    const { error: deleteError } = await supabase
-      .from("tasks")
-      .delete()
-      .eq("id", id);
+      // Delete the task
+      const { error: deleteError } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", id);
 
-    if (deleteError) {
-      console.error("❌ Error deleting task from database", deleteError);
-    } else {
-      console.log("✅ Task deleted successfully from database");
-      // 4. Update UI
-      setTasks(tasks.filter((task) => task.id !== id));
+      if (deleteError) throw deleteError;
+
+      // Update the local state
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      throw error;
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleEdit = async (id: string) => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .update({
-        title: editingTask.title,
-        description: editingTask.description,
-        email: session?.user?.email,
-        image_url: editingTask.image_url,
-      })
-      .eq("id", id);
-    if (error) {
-      console.log("error updating task", error);
-    }
-    console.log(data);
-    fetchTasks();
-    setEditingTask(null);
-  };
-
+  // Handle sign out
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.log("error signing out", error);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push("/signin");
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
-    alert("signed out");
   };
 
-  const [session, setSession] = useState<any>(null);
-  const fetchSession = async () => {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      console.log("error fetching session", error);
-    }
-    console.log(data);
-    setSession(data.session);
-  };
-
+  // Fetch tasks on component mount
   useEffect(() => {
-    fetchSession();
-  }, []);
+    fetchTasks();
 
-  useEffect(() => {
-    const channel = supabase.channel("task-channel");
-    channel
+    // Set up real-time subscription
+    const channel = supabase
+      .channel("realtime-tasks")
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "tasks",
+          filter: `email=eq.${session?.user?.email}`,
         },
         (payload) => {
-          setTasks((prevTasks) => [...prevTasks, payload?.new]);
+          if (payload.eventType === "INSERT") {
+            setTasks((prev) => [payload.new as Task, ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            setTasks((prev) =>
+              prev.map((task) =>
+                task.id === (payload.new as Task).id
+                  ? (payload.new as Task)
+                  : task
+              )
+            );
+          } else if (payload.eventType === "DELETE") {
+            setTasks((prev) =>
+              prev.filter((task) => task.id !== (payload.old as Task).id)
+            );
+          }
         }
       )
-      .subscribe((status, error) => {
-        console.log("subscription", status, error);
-      });
-  }, []);
+      .subscribe();
 
-  const [taskImage, setTaskImage] = useState<File | null>(null);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.email]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setTaskImage(file);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <Session />
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit();
-        }}
-        className="flex flex-col gap-2 p-4 border border-gray-300 rounded bg-zinc-300 text-black"
-      >
-        <label htmlFor="title">Title</label>
-        <input
-          className="border border-black rounded p-2"
-          type="text"
-          value={newTask.title}
-          onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-        />
-        <label htmlFor="description">Description</label>
-        <input
-          className="border border-black rounded p-2"
-          type="text"
-          value={newTask.description}
-          onChange={(e) =>
-            setNewTask({ ...newTask, description: e.target.value })
-          }
-        />
-
-        <input type="file" accept="image/*" onChange={handleFileChange} />
-
-        <button type="submit" className="bg-blue-500 text-white p-2">
-          Add Task
-        </button>
-      </form>
-      <div>
-        {tasks.map((task: any) => (
-          <div
-            key={task.id}
-            className="flex flex-col gap-2 p-4 border border-gray-300 rounded  text-black bg-amber-50"
-          >
-            <h2>{task.title}</h2>
-            <p>{task.description}</p>
-            <img src={task.image_url} alt={task.title + "image"} />
-
-            {editingTask?.id === task.id && (
-              <>
-                <input
-                  type="text"
-                  placeholder="New Title"
-                  className="border border-black rounded p-2"
-                  value={editingTask?.title}
-                  onChange={(e) =>
-                    setEditingTask({ ...editingTask, title: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder="New Description"
-                  className="border border-black rounded p-2"
-                  value={editingTask?.description}
-                  onChange={(e) =>
-                    setEditingTask({
-                      ...editingTask,
-                      description: e.target.value,
-                    })
-                  }
-                />
-              </>
-            )}
-            <div className="flex gap-2">
-              <button
-                className="bg-blue-500 text-white p-2"
-                onClick={() => setEditingTask(task)}
-              >
-                Edit
-              </button>
-              {editingTask?.id === task.id && (
-                <button
-                  className="bg-blue-500 text-white p-2"
-                  onClick={() => handleEdit(task.id)}
-                >
-                  Save
-                </button>
-              )}
-              <button
-                className="bg-red-500 text-white p-2"
-                onClick={() => handleDelete(task.id)}
-              >
-                Delete
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">Task Manager</h1>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-600">
+              {session?.user?.email}
+            </span>
+            <Button
+              variant="secondary"
+              size="default"
+              onClick={handleSignOut}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
-        ))}
-        <button className="bg-blue-500 text-white p-2" onClick={handleSignOut}>
-          Sign Out
-        </button>
-      </div>
-    </>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <TasksList
+            tasks={tasks}
+            onCreate={handleCreateTask}
+            onUpdate={handleUpdateTask}
+            onDelete={handleDeleteTask}
+            isLoading={isLoading}
+            isCreating={isCreating}
+            isDeleting={isDeleting}
+            isUpdating={isUpdating}
+          />
+        </div>
+      </main>
+
+      <footer className="bg-white border-t border-gray-200 mt-12">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm text-gray-500">
+            &copy; {new Date().getFullYear()} Task Manager. All rights reserved.
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 }
