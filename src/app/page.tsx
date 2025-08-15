@@ -65,28 +65,17 @@ export default function Home() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert([
-          {
-            title: taskData.title,
-            description: taskData.description,
-            email: session.user.email,
-            image_url: null,
-            image_path: null,
-          },
-        ])
-        .select()
-        .single();
+      let imageUrl = "";
+      let imagePath = "";
 
-      if (error) throw error;
-
-      // Handle image upload if present
+      // Handle image upload first if present
       if (taskData.image) {
         console.log("Image found, starting upload:", taskData.image.name);
 
+        // Generate a temporary ID for the file name
+        const tempId = crypto.randomUUID();
         const fileExt = taskData.image.name.split(".").pop();
-        const fileName = `${data.id}.${fileExt}`;
+        const fileName = `${tempId}.${fileExt}`;
         const filePath = `${session.user.id}/${fileName}`;
 
         console.log("Upload path:", filePath);
@@ -108,29 +97,32 @@ export default function Home() {
 
         console.log("Public URL:", publicUrl);
 
-        // Update the task with the image URL and path
-        const { error: updateError } = await supabase
-          .from("tasks")
-          .update({
-            image_url: publicUrl,
-            image_path: filePath,
-          })
-          .eq("id", data.id);
-
-        if (updateError) {
-          console.error("Update error:", updateError);
-          throw updateError;
-        }
-
-        console.log("Task updated with image info");
-
-        data.image_url = publicUrl;
-        data.image_path = filePath;
+        imageUrl = publicUrl;
+        imagePath = filePath;
       } else {
         console.log("No image provided");
       }
 
-      setTasks((prev) => [data, ...prev]);
+      // Create task with image data (or empty strings if no image)
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert([
+          {
+            title: taskData.title,
+            description: taskData.description,
+            email: session.user.email,
+            image_url: imageUrl,
+            image_path: imagePath,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log("Task created successfully:", data);
+
+
       return data;
     } catch (error) {
       console.error("Error creating task:", error);
