@@ -37,6 +37,7 @@ export function TaskForm({
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
+    console.log("File selected:", file);
     setFormData(prev => ({
       ...prev,
       image: file,
@@ -45,6 +46,8 @@ export function TaskForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Form data being submitted:", formData);
+    console.log("Image file:", formData.image);
     await onSubmit(formData);
     if (!initialData.title) {
       // Only reset if it's a new task form
@@ -75,7 +78,7 @@ export function TaskForm({
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
           Description
@@ -118,9 +121,9 @@ export function TaskForm({
         {initialData.image_url && !formData.image && (
           <div className="mt-2">
             <p className="text-sm text-gray-500">Current image:</p>
-            <img 
-              src={initialData.image_url} 
-              alt="Task" 
+            <img
+              src={initialData.image_url}
+              alt="Task"
               className="mt-1 h-20 w-auto object-cover rounded"
             />
           </div>

@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Task } from "@/types";
+import { PostgresChangesPayload } from "@/types/supabase";
 import { TasksList } from "@/features/tasks/components/TasksList";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -81,19 +83,30 @@ export default function Home() {
 
       // Handle image upload if present
       if (taskData.image) {
+        console.log("Image found, starting upload:", taskData.image.name);
+
         const fileExt = taskData.image.name.split(".").pop();
         const fileName = `${data.id}.${fileExt}`;
         const filePath = `${session.user.id}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
+        console.log("Upload path:", filePath);
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from("tasks-images")
           .upload(filePath, taskData.image);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          throw uploadError;
+        }
+
+        console.log("Upload successful:", uploadData);
 
         const {
           data: { publicUrl },
         } = supabase.storage.from("tasks-images").getPublicUrl(filePath);
+
+        console.log("Public URL:", publicUrl);
 
         // Update the task with the image URL and path
         const { error: updateError } = await supabase
@@ -104,10 +117,17 @@ export default function Home() {
           })
           .eq("id", data.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error("Update error:", updateError);
+          throw updateError;
+        }
+
+        console.log("Task updated with image info");
 
         data.image_url = publicUrl;
         data.image_path = filePath;
+      } else {
+        console.log("No image provided");
       }
 
       setTasks((prev) => [data, ...prev]);

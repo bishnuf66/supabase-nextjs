@@ -49,8 +49,8 @@ CREATE TABLE tasks (
   title TEXT NOT NULL,
   description TEXT,
   email TEXT NOT NULL,
-  image_url TEXT NOT NULL DEFAULT '',
-  image_path TEXT NOT NULL DEFAULT '',
+  image_url TEXT,
+  image_path TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
