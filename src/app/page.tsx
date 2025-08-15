@@ -4,11 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Task } from "@/types";
-import { PostgresChangesPayload } from "@/types/supabase";
 import { TasksList } from "@/features/tasks/components/TasksList";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-import Link from "next/link";
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -295,23 +293,38 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-muted border-t-primary"></div>
+          <p className="text-muted-foreground text-sm">Loading your tasks...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">Task Manager</h1>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">
-              {session?.user?.email}
-            </span>
+            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">T</span>
+            </div>
+            <h1 className="text-3xl font-bold text-foreground">Task Manager</h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="hidden sm:flex items-center space-x-2">
+              <div className="h-8 w-8 bg-muted rounded-full flex items-center justify-center">
+                <span className="text-muted-foreground text-xs font-medium">
+                  {session?.user?.email?.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {session?.user?.email}
+              </span>
+            </div>
             <Button
-              variant="secondary"
+              variant="outline"
               size="default"
               onClick={handleSignOut}
               className="flex items-center gap-2"
@@ -323,8 +336,8 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+      <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-0">
           <TasksList
             tasks={tasks}
             onCreate={handleCreateTask}
@@ -338,9 +351,9 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="bg-white border-t border-gray-200 mt-12">
+      <footer className="border-t bg-card/30 mt-12">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} Task Manager. All rights reserved.
           </p>
         </div>
