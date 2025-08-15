@@ -24,9 +24,11 @@ export function TaskCard({ task, onDelete, onUpdate, isDeleting, isUpdating }: T
 
   const handleDelete = () => {
     if (isConfirmingDelete) {
+      console.log("Confirming delete for task:", task.id);
       onDelete(task.id);
       setIsConfirmingDelete(false);
     } else {
+      console.log("First click - asking for confirmation");
       setIsConfirmingDelete(true);
       // Reset confirmation after 3 seconds
       setTimeout(() => {
@@ -78,19 +80,24 @@ export function TaskCard({ task, onDelete, onUpdate, isDeleting, isUpdating }: T
               variant="ghost"
               size="icon"
               onClick={handleDelete}
-              className={`${isConfirmingDelete ? 'text-red-600' : 'text-gray-500'} hover:text-red-600`}
+              className={`${isConfirmingDelete ? 'text-red-600 bg-red-50' : 'text-gray-500'} hover:text-red-600`}
               disabled={isDeleting}
+              title={isConfirmingDelete ? 'Click again to confirm delete' : 'Delete task'}
             >
-              {isConfirmingDelete ? (
+              {isDeleting ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent"></div>
+              ) : isConfirmingDelete ? (
                 <Check className="h-4 w-4" />
               ) : (
                 <Trash2 className="h-4 w-4" />
               )}
-              <span className="sr-only">Delete</span>
+              <span className="sr-only">
+                {isConfirmingDelete ? 'Confirm delete' : 'Delete'}
+              </span>
             </Button>
           </div>
         </div>
-        
+
         {task.image_url && (
           <div className="mt-4">
             <div className="relative rounded-lg overflow-hidden border border-gray-200">

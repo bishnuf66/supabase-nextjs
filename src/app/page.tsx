@@ -212,6 +212,7 @@ export default function Home() {
   const handleDeleteTask = async (id: string) => {
     try {
       setIsDeleting(true);
+      console.log("Starting delete for task:", id);
 
       // First, get the task to check for an associated image
       const { data: taskToDelete, error: fetchError } = await supabase
@@ -220,10 +221,16 @@ export default function Home() {
         .eq("id", id)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error("Error fetching task to delete:", fetchError);
+        throw fetchError;
+      }
+
+      console.log("Task to delete:", taskToDelete);
 
       // Delete the image if it exists
-      if (taskToDelete?.image_path) {
+      if (taskToDelete?.image_path && taskToDelete.image_path !== "") {
+        console.log("Deleting image:", taskToDelete.image_path);
         const { error: deleteImageError } = await supabase.storage
           .from("tasks-images")
           .remove([taskToDelete.image_path]);
@@ -231,16 +238,26 @@ export default function Home() {
         if (deleteImageError) {
           console.error("Error deleting image:", deleteImageError);
           // Continue with task deletion even if image deletion fails
+        } else {
+          console.log("Image deleted successfully");
         }
+      } else {
+        console.log("No image to delete");
       }
 
       // Delete the task
+      console.log("Deleting task from database");
       const { error: deleteError } = await supabase
         .from("tasks")
         .delete()
         .eq("id", id);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error("Error deleting task:", deleteError);
+        throw deleteError;
+      }
+
+      console.log("Task deleted successfully");
 
       // Update the local state
       setTasks((prev) => prev.filter((task) => task.id !== id));
