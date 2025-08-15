@@ -7,7 +7,7 @@ import { ImageIcon, Plus } from 'lucide-react';
 
 interface TaskFormProps {
   onSubmit: (data: TaskFormData) => Promise<void>;
-  initialData?: Partial<TaskFormData>;
+  initialData?: Partial<TaskFormData> & { image_url?: string | null };
   isSubmitting?: boolean;
   onCancel?: () => void;
 }
@@ -19,9 +19,9 @@ export function TaskForm({
   onCancel,
 }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskFormData>({
-    title: initialData.title || '',
-    description: initialData.description || '',
-    image: initialData.image || null,
+    title: initialData?.title || '',
+    description: initialData?.description || '',
+    image: initialData?.image || null,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 

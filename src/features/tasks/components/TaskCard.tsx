@@ -69,18 +69,18 @@ export function TaskCard({ task, onDelete, onUpdate, isDeleting, isUpdating }: T
           <div className="flex space-x-2">
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
+              className="h-8 w-8 p-0 text-gray-500 hover:text-indigo-600"
               onClick={() => setIsEditing(true)}
-              className="text-gray-500 hover:text-indigo-600"
             >
               <Edit className="h-4 w-4" />
               <span className="sr-only">Edit</span>
             </Button>
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
+              className={`h-8 w-8 p-0 ${isConfirmingDelete ? 'text-red-600 bg-red-50' : 'text-gray-500'} hover:text-red-600`}
               onClick={handleDelete}
-              className={`${isConfirmingDelete ? 'text-red-600 bg-red-50' : 'text-gray-500'} hover:text-red-600`}
               disabled={isDeleting}
               title={isConfirmingDelete ? 'Click again to confirm delete' : 'Delete task'}
             >

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase-client';
+import { supabase } from '@/app/supabase-client';
 import { Task, TaskFormData } from '@/types';
 
 export const useTasks = () => {
